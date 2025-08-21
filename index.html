@@ -170,11 +170,11 @@
               return el.href;
           };
 
-          // Aguardar o DOM estar pronto para processar os links
+          // Função para processar links existentes
           const processLinks = () => {
               document.querySelectorAll('a').forEach(el => {
                   try {
-                      const elURL = new URL(el.href, window.location.origin); // Base para URLs relativas
+                      const elURL = new URL(el.href, window.location.origin);
                       if (!elURL.hash) {
                           el.href = updateLinks(el, elURL);
                       }
@@ -187,7 +187,7 @@
                   let actualSrc = iframe.hasAttribute('data-src') ? iframe.getAttribute('data-src') : iframe.src;
                   if (actualSrc) {
                       try {
-                          const iframeURL = new URL(actualSrc, window.location.origin); // Base para URLs relativas
+                          const iframeURL = new URL(actualSrc, window.location.origin);
                           if (iframe.hasAttribute('data-src')) {
                               iframe.setAttribute('data-src', updateLinks(iframe, iframeURL));
                           } else {
@@ -200,26 +200,58 @@
               });
           };
 
-          // Executar quando o DOM estiver carregado
-          if (document.readyState === 'loading') {
-              document.addEventListener('DOMContentLoaded', processLinks);
-          } else {
+          // Função para inicializar o sistema de rastreamento
+          const initializeTracking = () => {
+              // Processar links existentes
               processLinks();
+
+              // Configurar observer para links dinâmicos (apenas se document.body existir)
+              if (document.body) {
+                  const observer = new MutationObserver(function(mutations) {
+                      let shouldProcess = false;
+                      
+                      mutations.forEach(function(mutation) {
+                          if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                              // Verificar se algum nó adicionado contém links
+                              mutation.addedNodes.forEach(function(node) {
+                                  if (node.nodeType === Node.ELEMENT_NODE) {
+                                      if (node.tagName === 'A' || node.querySelector && node.querySelector('a')) {
+                                          shouldProcess = true;
+                                      }
+                                  }
+                              });
+                          }
+                      });
+
+                      if (shouldProcess) {
+                          processLinks();
+                      }
+                  });
+
+                  observer.observe(document.body, {
+                      childList: true,
+                      subtree: true
+                  });
+              }
+          };
+
+          // Aguardar o DOM estar completamente carregado
+          if (document.readyState === 'loading') {
+              document.addEventListener('DOMContentLoaded', initializeTracking);
+          } else if (document.readyState === 'interactive' || document.readyState === 'complete') {
+              // DOM já está carregado, mas aguardar um pouco para garantir que o body existe
+              if (document.body) {
+                  initializeTracking();
+              } else {
+                  // Aguardar o body estar disponível
+                  const bodyCheckInterval = setInterval(() => {
+                      if (document.body) {
+                          clearInterval(bodyCheckInterval);
+                          initializeTracking();
+                      }
+                  }, 10);
+              }
           }
-
-          // Também processar links dinâmicos adicionados pelo React
-          const observer = new MutationObserver(function(mutations) {
-              mutations.forEach(function(mutation) {
-                  if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                      processLinks();
-                  }
-              });
-          });
-
-          observer.observe(document.body, {
-              childList: true,
-              subtree: true
-          });
 
       })();
     </script>
